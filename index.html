@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FinanceFlow — Personal Finance</title>
+  <link rel="stylesheet" href="css/styles.css" />
+
+  <!-- Мінімальні стилі для loader, щоб він був видимий миттєво (навіть до завантаження CSS) -->
+  <style>
+    .loader{position:fixed;inset:0;display:grid;place-items:center;z-index:9999;background:#0b0f17}
+    .loader--hidden{opacity:0;pointer-events:none;transition:opacity .35s ease}
+  </style>
+
+  <!-- Показувати loader також після F5/оновлення -->
+  <script>
+    (function(){
+      try{
+        var shouldShow = sessionStorage.getItem('ff_show_loader') === '1';
+        if(shouldShow) document.documentElement.classList.add('ff-refresh');
+      }catch(e){}
+    })();
+  </script>
+</head>
+
+<body class="page" data-theme="dark">
+  <!-- LOADER -->
+  <div class="loader" id="loader" aria-hidden="false">
+    <div class="loader__card">
+      <div class="loader__brand">
+        <div class="loader__mark">₴</div>
+        <div class="loader__text">
+          <div class="loader__title">FinanceFlow</div>
+          <div class="loader__subtitle">loading personal finance…</div>
+        </div>
+      </div>
+
+      <div class="loader__ring" aria-hidden="true"></div>
+
+      <div class="loader__progress" aria-hidden="true">
+        <div class="loader__bar"></div>
+      </div>
+
+      <div class="loader__hint">Підготовка даних • localStorage • offline</div>
+    </div>
+  </div>
+
+  <div class="app" id="appRoot">
+    <aside class="sidebar">
+      <div class="sidebar__brand">
+        <div class="logo">
+          <div class="logo__mark">₴</div>
+          <div class="logo__text">
+            <div class="logo__title">FinanceFlow</div>
+            <div class="logo__subtitle">personal finance</div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button class="nav__item nav__item--active" data-route="dashboard">
+          <span class="nav__icon">📊</span><span class="nav__label">Дашборд</span>
+        </button>
+        <button class="nav__item" data-route="transactions">
+          <span class="nav__icon">🧾</span><span class="nav__label">Транзакції</span>
+        </button>
+        <button class="nav__item" data-route="budgets">
+          <span class="nav__icon">🎯</span><span class="nav__label">Бюджети</span>
+        </button>
+        <button class="nav__item" data-route="goals">
+          <span class="nav__icon">🏁</span><span class="nav__label">Цілі</span>
+        </button>
+        <button class="nav__item" data-route="reports">
+          <span class="nav__icon">📈</span><span class="nav__label">Звіти</span>
+        </button>
+        <button class="nav__item" data-route="settings">
+          <span class="nav__icon">⚙️</span><span class="nav__label">Налаштування</span>
+        </button>
+      </nav>
+
+      <div class="sidebar__footer">
+        <div class="chip">
+          <span class="chip__dot"></span>
+          <span class="chip__text">localStorage • offline</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar__left">
+          <div class="topbar__title" id="pageTitle">Дашборд</div>
+          <div class="topbar__meta" id="pageMeta">Огляд фінансів за поточний місяць</div>
+        </div>
+
+        <div class="topbar__right">
+          <button class="btn btn--ghost" id="btnTheme" title="Перемкнути тему">🌗</button>
+
+          <button class="btn btn--ghost" id="btnExportCSV" title="Експорт CSV">⬇️ CSV</button>
+          <label class="btn btn--ghost topbar__file">
+            ⬆️ CSV
+            <input type="file" id="fileImportCSV" accept=".csv" />
+          </label>
+
+          <button class="btn btn--primary" id="btnAddTransaction">+ Транзакція</button>
+        </div>
+      </header>
+
+      <section class="content">
+        <!-- DASHBOARD -->
+        <div class="view view--active" data-view="dashboard">
+          <div class="grid grid--cards">
+            <article class="card stat">
+              <div class="stat__label">Баланс</div>
+              <div class="stat__value" id="statBalance">0</div>
+              <div class="stat__hint" id="statBalanceHint">Сума всіх доходів мінус витрати</div>
+            </article>
+
+            <article class="card stat">
+              <div class="stat__label">Дохід (місяць)</div>
+              <div class="stat__value stat__value--good" id="statIncomeMonth">0</div>
+              <div class="stat__hint" id="statIncomeHint">Поточний місяць</div>
+            </article>
+
+            <article class="card stat">
+              <div class="stat__label">Витрати (місяць)</div>
+              <div class="stat__value stat__value--bad" id="statExpenseMonth">0</div>
+              <div class="stat__hint" id="statExpenseHint">Поточний місяць</div>
+            </article>
+
+            <article class="card stat">
+              <div class="stat__label">Збереження (місяць)</div>
+              <div class="stat__value" id="statSavingsMonth">0</div>
+              <div class="stat__hint" id="statSavingsHint">Дохід - витрати</div>
+            </article>
+          </div>
+
+          <div class="grid grid--two">
+            <article class="card">
+              <div class="card__head">
+                <div class="card__title">Структура витрат</div>
+                <div class="card__subtitle">ТОП категорії за місяць</div>
+              </div>
+              <div class="card__body">
+                <canvas class="chart" id="chartPie" width="800" height="380"></canvas>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card__head">
+                <div class="card__title">Динаміка балансу</div>
+                <div class="card__subtitle">Останні 30 днів</div>
+              </div>
+              <div class="card__body">
+                <canvas class="chart" id="chartLine" width="800" height="380"></canvas>
+              </div>
+            </article>
+          </div>
+
+          <article class="card">
+            <div class="card__head">
+              <div>
+                <div class="card__title">Останні транзакції</div>
+                <div class="card__subtitle">Швидкий перегляд</div>
+              </div>
+              <button class="btn btn--ghost" data-route-jump="transactions">Всі →</button>
+            </div>
+            <div class="card__body">
+              <div class="table">
+                <div class="table__row table__row--head">
+                  <div class="table__cell">Дата</div>
+                  <div class="table__cell">Тип</div>
+                  <div class="table__cell">Категорія</div>
+                  <div class="table__cell">Нотатка</div>
+                  <div class="table__cell table__cell--right">Сума</div>
+                </div>
+                <div id="recentTx"></div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div class="view" data-view="transactions">
+          <article class="card">
+            <div class="card__head">
+              <div>
+                <div class="card__title">Транзакції</div>
+                <div class="card__subtitle">Фільтруй, шукай, експортуй</div>
+              </div>
+              <div class="toolbar">
+                <input class="input" id="txSearch" placeholder="Пошук по нотатці..." />
+                <select class="select" id="txType">
+                  <option value="all">Всі</option>
+                  <option value="income">Дохід</option>
+                  <option value="expense">Витрата</option>
+                </select>
+                <select class="select" id="txCategory"></select>
+                <input class="input" id="txFrom" type="date" />
+                <input class="input" id="txTo" type="date" />
+                <button class="btn btn--ghost" id="txReset">Скинути</button>
+              </div>
+            </div>
+            <div class="card__body">
+              <div class="table">
+                <div class="table__row table__row--head">
+                  <div class="table__cell">Дата</div>
+                  <div class="table__cell">Тип</div>
+                  <div class="table__cell">Категорія</div>
+                  <div class="table__cell">Нотатка</div>
+                  <div class="table__cell table__cell--right">Сума</div>
+                  <div class="table__cell table__cell--right">Дії</div>
+                </div>
+                <div id="txList"></div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- BUDGETS -->
+        <div class="view" data-view="budgets">
+          <div class="grid grid--two">
+            <article class="card">
+              <div class="card__head">
+                <div>
+                  <div class="card__title">Бюджети по категоріях</div>
+                  <div class="card__subtitle">Ліміти на місяць</div>
+                </div>
+              </div>
+              <div class="card__body">
+                <form class="form" id="budgetForm">
+                  <div class="form__row">
+                    <label class="field">
+                      <span class="field__label">Категорія</span>
+                      <select class="select" id="budgetCategory"></select>
+                    </label>
+                    <label class="field">
+                      <span class="field__label">Ліміт</span>
+                      <input class="input" id="budgetLimit" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </label>
+                    <button class="btn btn--primary" type="submit">Додати/Оновити</button>
+                  </div>
+                </form>
+
+                <div class="stack" id="budgetList"></div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card__head">
+                <div>
+                  <div class="card__title">Поради</div>
+                  <div class="card__subtitle">Автоматичні підказки</div>
+                </div>
+              </div>
+              <div class="card__body" id="budgetTips"></div>
+            </article>
+          </div>
+        </div>
+
+        <!-- GOALS -->
+        <div class="view" data-view="goals">
+          <div class="grid grid--two">
+            <article class="card">
+              <div class="card__head">
+                <div>
+                  <div class="card__title">Цілі</div>
+                  <div class="card__subtitle">Накопичення та прогрес</div>
+                </div>
+              </div>
+              <div class="card__body">
+                <form class="form" id="goalForm">
+                  <div class="form__row">
+                    <label class="field">
+                      <span class="field__label">Назва</span>
+                      <input class="input" id="goalTitle" placeholder="Напр. PC / Авто / Подорож" />
+                    </label>
+                    <label class="field">
+                      <span class="field__label">Цільова сума</span>
+                      <input class="input" id="goalTarget" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </label>
+                    <button class="btn btn--primary" type="submit">Створити</button>
+                  </div>
+                </form>
+
+                <div class="stack" id="goalList"></div>
+              </div>
+            </article>
+
+            <article class="card">
+              <div class="card__head">
+                <div>
+                  <div class="card__title">Поповнення цілі</div>
+                  <div class="card__subtitle">Швидке додавання</div>
+                </div>
+              </div>
+              <div class="card__body">
+                <form class="form" id="goalAddForm">
+                  <div class="form__row">
+                    <label class="field">
+                      <span class="field__label">Ціль</span>
+                      <select class="select" id="goalPick"></select>
+                    </label>
+                    <label class="field">
+                      <span class="field__label">Сума</span>
+                      <input class="input" id="goalAddAmount" type="number" min="0" step="0.01" placeholder="0.00" />
+                    </label>
+                    <button class="btn btn--primary" type="submit">Додати</button>
+                  </div>
+                </form>
+                <div class="note" id="goalNote"></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- REPORTS -->
+        <div class="view" data-view="reports">
+          <article class="card">
+            <div class="card__head">
+              <div>
+                <div class="card__title">Звіти</div>
+                <div class="card__subtitle">Аналіз по періодах</div>
+              </div>
+              <div class="toolbar">
+                <input class="input" id="repFrom" type="date" />
+                <input class="input" id="repTo" type="date" />
+                <button class="btn btn--primary" id="repBuild">Побудувати</button>
+              </div>
+            </div>
+            <div class="card__body">
+              <div class="grid grid--cards">
+                <article class="card stat">
+                  <div class="stat__label">Дохід</div>
+                  <div class="stat__value stat__value--good" id="repIncome">0</div>
+                </article>
+                <article class="card stat">
+                  <div class="stat__label">Витрати</div>
+                  <div class="stat__value stat__value--bad" id="repExpense">0</div>
+                </article>
+                <article class="card stat">
+                  <div class="stat__label">Різниця</div>
+                  <div class="stat__value" id="repNet">0</div>
+                </article>
+                <article class="card stat">
+                  <div class="stat__label">Транзакцій</div>
+                  <div class="stat__value" id="repCount">0</div>
+                </article>
+              </div>
+
+              <div class="grid grid--two">
+                <article class="card">
+                  <div class="card__head">
+                    <div class="card__title">Витрати по категоріях</div>
+                    <div class="card__subtitle">Вибраний період</div>
+                  </div>
+                  <div class="card__body">
+                    <canvas class="chart" id="chartRepPie" width="800" height="380"></canvas>
+                  </div>
+                </article>
+                <article class="card">
+                  <div class="card__head">
+                    <div class="card__title">Динаміка (нетто)</div>
+                    <div class="card__subtitle">По днях</div>
+                  </div>
+                  <div class="card__body">
+                    <canvas class="chart" id="chartRepLine" width="800" height="380"></canvas>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="view" data-view="settings">
+          <article class="card">
+            <div class="card__head">
+              <div>
+                <div class="card__title">Налаштування</div>
+                <div class="card__subtitle">Валюта, тема, бекап</div>
+              </div>
+            </div>
+            <div class="card__body">
+              <div class="grid grid--two">
+                <div class="panel">
+                  <div class="panel__title">Валюта</div>
+                  <div class="panel__body">
+                    <label class="field">
+                      <span class="field__label">Символ</span>
+                      <input class="input" id="setCurrency" placeholder="₴ або $" />
+                    </label>
+                    <button class="btn btn--primary" id="setSaveCurrency">Зберегти</button>
+                  </div>
+                </div>
+
+                <div class="panel">
+                  <div class="panel__title">Резервна копія</div>
+                  <div class="panel__body">
+                    <button class="btn btn--ghost" id="btnExportJSON">Експорт JSON</button>
+                    <label class="btn btn--ghost topbar__file">
+                      Імпорт JSON
+                      <input type="file" id="fileImportJSON" accept=".json" />
+                    </label>
+                    <button class="btn btn--danger" id="btnResetAll">Скинути все</button>
+                    <div class="note note--muted">⚠️ Скидання видалить всі дані з localStorage.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal" id="modal" aria-hidden="true">
+    <div class="modal__backdrop" data-modal-close></div>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal__head">
+        <div class="modal__title" id="modalTitle">Нова транзакція</div>
+        <button class="btn btn--ghost" data-modal-close>✕</button>
+      </div>
+      <div class="modal__body">
+        <form class="form" id="txForm">
+          <input type="hidden" id="txId" />
+          <div class="form__grid">
+            <label class="field">
+              <span class="field__label">Тип</span>
+              <select class="select" id="txFormType">
+                <option value="expense">Витрата</option>
+                <option value="income">Дохід</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Дата</span>
+              <input class="input" id="txFormDate" type="date" />
+            </label>
+
+            <label class="field">
+              <span class="field__label">Категорія</span>
+              <select class="select" id="txFormCategory"></select>
+            </label>
+
+            <label class="field">
+              <span class="field__label">Сума</span>
+              <input class="input" id="txFormAmount" type="number" step="0.01" min="0" placeholder="0.00" />
+            </label>
+
+            <label class="field field--full">
+              <span class="field__label">Нотатка</span>
+              <input class="input" id="txFormNote" placeholder="Напр. Costco, бензин, зарплата..." />
+            </label>
+
+            <div class="form__actions">
+              <button class="btn btn--primary" type="submit">Зберегти</button>
+              <button class="btn btn--ghost" type="button" data-modal-close>Скасувати</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
